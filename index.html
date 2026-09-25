@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prompt Harnessing System (Duymt Framework & Cloud Sync)</title>
+  <meta name="description" content="Hệ thống Quản lý Prompt & Harnessing với đồng bộ đám mây Firebase, cấu trúc hóa tư duy, hỗ trợ Markdown, LaTeX, upload ảnh và chạy thử AI trực tiếp." />
+  <meta property="og:title" content="Prompt Harnessing System (Duymt Framework & Cloud Sync)" />
+  <meta property="og:description" content="Hệ thống Quản lý Prompt & Harnessing với đồng bộ đám mây Firebase, cấu trúc hóa tư duy, hỗ trợ Markdown, LaTeX, upload ảnh và chạy thử AI trực tiếp." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #f3f4f6; --bg-card: #ffffff; --text-primary: #1f2937; 
+      --text-secondary: #6b7280; --border-color: #e5e7eb; --accent: #4f46e5;
+      --shadow-3d: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    [data-theme="dark"] {
+      --bg-primary: #111827; --bg-card: #1f2937; --text-primary: #f9fafb; 
+      --text-secondary: #9ca3af; --border-color: #374151; --accent: #818cf8;
+      --shadow-3d: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3), 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+    }
+    body { background-color: var(--bg-primary); color: var(--text-primary); transition: all 0.3s ease; }
+    .card-3d {
+      background-color: var(--bg-card); border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-3d); border-radius: 0.75rem; transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card-3d:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1); }
+    .btn-primary { background-color: var(--accent); color: white; transition: opacity 0.2s; }
+    .btn-primary:hover { opacity: 0.9; }
+    #toast { position: fixed; bottom: 20px; right: 20px; transform: translateX(150%); transition: transform 0.3s ease; z-index: 100; }
+    #toast.show { transform: translateX(0); }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .modal-content { background: var(--bg-card); padding: 2rem; border-radius: 1rem; max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-3d); transform: scale(0.95); transition: transform 0.2s; }
+    .modal-overlay.active .modal-content { transform: scale(1); }
+    @media print {
+      body { background: white !important; color: black !important; }
+      .no-print { display: none !important; }
+      .card-3d { box-shadow: none !important; border: 1px solid black !important; background: white !important; margin-bottom: 1rem; break-inside: avoid; }
+    }
+    .prose h1, .prose h2, .prose h3 { font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; color: var(--text-primary); }
+    .prose code { background: rgba(0,0,0,0.08); padding: 0.2em 0.4em; border-radius: 0.25rem; font-size: 0.9em; font-family: monospace; }
+    .prose pre { background: rgba(0,0,0,0.05); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; border: 1px solid var(--border-color); }
+    [data-theme="dark"] .prose code, [data-theme="dark"] .prose pre { background: rgba(255,255,255,0.1); }
+    .link-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(79, 70, 229, 0.1); color: var(--accent); padding: 2px 8px; border-radius: 999px; font-size: 0.85em; text-decoration: none; border: 1px solid var(--accent); transition: all 0.2s; }
+    .link-badge:hover { background: var(--accent); color: white; }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+  <div class="max-w-6xl mx-auto">
+    <!-- HEADER & AUTH -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 no-print">
+      <div>
+        <h1 class="text-3xl font-bold flex items-center gap-2" style="color: var(--accent);">
+          <span>🧠 Prompt Harnessing</span>
+          <span id="cloud-badge" class="text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-full font-normal">LocalStorage</span>
+        </h1>
+        <p class="text-sm mt-1" style="color: var(--text-secondary);">Cấu trúc hóa tư duy & Đồng bộ đám mây Firebase (Duymt Framework)</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <!-- AUTH CONTAINER -->
+        <div id="auth-container" class="flex items-center gap-2">
+          <button id="login-btn" onclick="loginWithGoogle()" class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm hover:bg-gray-50 transition">
+            <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+            Đăng nhập Google
+          </button>
+        </div>
+        <button onclick="toggleTheme()" class="p-2 rounded-full border hover:bg-gray-100 dark:hover:bg-gray-800 transition" style="border-color: var(--border-color);" title="Chuyển đổi giao diện">
+          <span id="theme-icon">🌙</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- API KEYS CONFIGURATION CARD -->
+    <div class="card-3d p-4 mb-6 no-print">
+      <div class="flex justify-between items-center cursor-pointer" onclick="toggleApiKeysPanel()">
+        <h2 class="text-sm font-bold flex items-center gap-2" style="color: var(--accent);">
+          <span>🔑 Cấu hình API Keys (Gemini, OpenAI, DeepSeek, Grok)</span>
+        </h2>
+        <span id="apiKeyToggleIcon" class="text-xs">▼ Thu gọn</span>
+      </div>
+      <div id="apiKeysPanel" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+        <div>
+          <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Gemini API Key:</label>
+          <input id="keyGemini" type="password" placeholder="AIzaSy..." onchange="saveApiKeys()" class="w-full p-2 rounded border text-xs" style="background: var(--bg-primary); border-color: var(--border-color);" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">OpenAI API Key:</label>
+          <input id="keyOpenai" type="password" placeholder="sk-..." onchange="saveApiKeys()" class="w-full p-2 rounded border text-xs" style="background: var(--bg-primary); border-color: var(--border-color);" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">DeepSeek API Key:</label>
+          <input id="keyDeepseek" type="password" placeholder="sk-..." onchange="saveApiKeys()" class="w-full p-2 rounded border text-xs" style="background: var(--bg-primary); border-color: var(--border-color);" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Grok API Key:</label>
+          <input id="keyGrok" type="password" placeholder="xai-..." onchange="saveApiKeys()" class="w-full p-2 rounded border text-xs" style="background: var(--bg-primary); border-color: var(--border-color);" />
+        </div>
+      </div>
+    </div>
+
+    <!-- FORM INPUT -->
+    <div class="card-3d p-6 mb-6 no-print">
+      <div class="mb-4 flex items-center gap-2">
+        <span class="text-sm font-semibold whitespace-nowrap">⚡ Khung mẫu:</span>
+        <select id="templateSelect" onchange="applyTemplate()" class="flex-1 p-2 rounded border text-sm" style="background: var(--bg-primary); border-color: var(--border-color);">
+          <option value="">-- Chọn khung tư duy có sẵn --</option>
+          <option value="math">📐 Khung Giải toán (Deconstruction)</option>
+          <option value="policy">📊 Khung Phân tích Chính sách (QA Analysis)</option>
+          <option value="metaphor">🎭 Khung Ẩn dụ Đa tầng (Sư phạm Duymt)</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div class="flex items-center gap-2">
+          <input id="title" type="text" placeholder="Tiêu đề Prompt" class="flex-1 p-2 rounded border focus:ring-2 focus:ring-indigo-500 outline-none" style="background: var(--bg-primary); border-color: var(--border-color);" />
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="category" type="text" placeholder="Thư mục (VD: Toán, AI)" class="flex-1 p-2 rounded border focus:ring-2 focus:ring-indigo-500 outline-none" style="background: var(--bg-primary); border-color: var(--border-color);" list="category-suggestions" />
+          <datalist id="category-suggestions"></datalist>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="hashtags" type="text" placeholder="Hashtags (VD: #gemini, toán)" class="flex-1 p-2 rounded border focus:ring-2 focus:ring-indigo-500 outline-none" style="background: var(--bg-primary); border-color: var(--border-color);" list="hashtag-suggestions" />
+          <datalist id="hashtag-suggestions"></datalist>
+        </div>
+        <button onclick="savePrompt()" class="btn-primary px-4 py-2 rounded font-semibold flex items-center justify-center gap-2 shadow-md">💾 Lưu Prompt</button>
+      </div>
+
+      <!-- UPLOAD ẢNH -->
+      <div class="mb-4 flex items-center gap-4">
+        <label class="flex-1 cursor-pointer flex items-center gap-2 p-2 rounded border border-dashed hover:bg-gray-50 dark:hover:bg-gray-800 transition" style="border-color: var(--border-color);">
+          <span>📷</span>
+          <span class="text-sm text-gray-500">Chọn ảnh đại diện (PNG/JPG, max 500KB)</span>
+          <input type="file" id="imageInput" accept="image/png, image/jpeg" class="hidden" onchange="previewImage(this)" />
+        </label>
+        <img id="imagePreview" class="hidden w-16 h-16 object-cover rounded border" style="border-color: var(--border-color);" />
+        <button id="removeImage" onclick="removeImage()" class="hidden text-red-500 hover:text-red-700 text-sm">✕</button>
+      </div>
+
+      <div class="flex items-start gap-2 mb-4">
+        <textarea id="content" rows="4" placeholder="Nội dung (Hỗ trợ Markdown, LaTeX $x^2$, Biến {{context}}, và URL sẽ tự động thành link)..." class="flex-1 p-3 rounded border focus:ring-2 focus:ring-indigo-500 outline-none resize-y" style="background: var(--bg-primary); border-color: var(--border-color);"></textarea>
+      </div>
+      
+      <div class="flex flex-wrap gap-3 items-center pt-4 border-t" style="border-color: var(--border-color);">
+        <input id="search" oninput="debouncedSearch()" type="text" placeholder="🔍 Tìm kiếm..." class="flex-1 min-w-[200px] p-2 rounded border focus:ring-2 focus:ring-indigo-500 outline-none" style="background: var(--bg-primary); border-color: var(--border-color);" />
+        <select id="categoryFilter" onchange="handleSearch()" class="p-2 rounded border min-w-[160px] focus:ring-2 focus:ring-indigo-500 outline-none" style="background: var(--bg-primary); border-color: var(--border-color);">
+          <option value="">📂 Tất cả thư mục</option>
+        </select>
+        <div class="flex gap-2 ml-auto">
+          <button onclick="exportData()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm font-medium transition">⬇️ Xuất</button>
+          <label class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm font-medium cursor-pointer transition">
+            ⬆️ Nhập
+            <input type="file" id="importFile" class="hidden" onchange="importData(event)" accept=".json" />
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div id="promptList" class="space-y-6"></div>
+    <div id="pagination" class="mt-8 flex justify-center gap-2 no-print"></div>
+  </div>
+
+  <!-- AI TEST MODAL -->
+  <div id="aiModal" class="modal-overlay">
+    <div class="modal-content card-3d">
+      <div class="flex justify-between items-center mb-4 pb-2 border-b" style="border-color: var(--border-color);">
+        <h3 class="text-lg font-bold flex items-center gap-2" style="color: var(--accent);">🧪 Chạy thử Prompt với AI</h3>
+        <button onclick="closeAiModal()" class="text-gray-500 hover:text-gray-700 text-lg">✕</button>
+      </div>
+      <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Nhà cung cấp (Provider):</label>
+          <select id="aiProvider" onchange="updateModelOptions()" class="w-full p-2 rounded border text-sm" style="background: var(--bg-primary); border-color: var(--border-color);">
+            <option value="gemini">Google Gemini</option>
+            <option value="openai">OpenAI (ChatGPT)</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="grok">Grok (xAI)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Mô hình (Model):</label>
+          <input id="aiModel" type="text" value="gemini-3.6-flash" class="w-full p-2 rounded border text-sm" style="background: var(--bg-primary); border-color: var(--border-color);" />
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Phương thức xuất kết quả:</label>
+        <div class="flex gap-4 text-sm">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="outputMode" value="inapp" checked class="accent-indigo-600" />
+            <span>🖥️ Ngay trên ứng dụng</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="outputMode" value="newtab" class="accent-indigo-600" />
+            <span>🌐 Mở ở Tab trình duyệt khác</span>
+          </label>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Prompt gốc:</label>
+        <div id="aiModalPrompt" class="p-3 rounded text-xs bg-gray-50 dark:bg-gray-800 border max-h-32 overflow-y-auto font-mono" style="border-color: var(--border-color);"></div>
+      </div>
+      <div id="aiModalResultArea" class="hidden mb-4">
+        <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Kết quả từ AI:</label>
+        <div id="aiModalResult" class="prose p-4 rounded bg-gray-50 dark:bg-gray-800 border max-h-96 overflow-y-auto text-sm" style="border-color: var(--border-color);"></div>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeAiModal()" class="px-4 py-2 rounded border text-sm" style="border-color: var(--border-color);">Đóng</button>
+        <button id="aiRunBtn" onclick="executeAiTest()" class="btn-primary px-4 py-2 rounded font-semibold text-sm flex items-center gap-2">🚀 Gửi yêu cầu AI</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="card-3d px-6 py-3 font-semibold flex items-center gap-2"></div>
+
+  <!-- FIREBASE & APP SCRIPT -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, doc, setDoc, deleteDoc, getDocs, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // Fetch firebase config from /firebase-applet-config.json or fallback
+    let firebaseConfig = null;
+    let db = null;
+    let auth = null;
+    let currentUser = null;
+    let unsubscribeFirestore = null;
+
+    window.prompts = JSON.parse(localStorage.getItem("prompts_duymt_v4")) || [];
+    window.currentPage = 1;
+    window.itemsPerPage = 6;
+    let searchTimeout = null;
+    window.currentImageBase64 = null;
+    let activeAiPromptContent = '';
+
+    const TEMPLATES = {
+      math: `**Vai trò:** Trợ lý toán học (Phương pháp Sư phạm Duymt).\n**Nhiệm vụ:** Phân tích: {{bai_toan}}\n**Cấu trúc:**\n1. **Phân rã:** Chia nhỏ thành phần cơ bản.\n2. **Ẩn dụ:** Giải thích bản chất (VD: tổng telescope).\n3. **Lời giải:** Từng bước logic, dùng LaTeX.\n4. **Mở rộng:** Biến thể kiểm tra độ hiểu sâu.`,
+      policy: `**Vai trò:** Chuyên gia phân tích chính sách (Tiến sĩ QA_Analysis).\n**Bối cảnh:** {{boi_canh}}\n**Nhiệm vụ:** Phân tích: {{noi_dung}}\n**Đầu ra:** Executive Summary, System Analysis, Data & Risk Matrix, Strategic Recommendations.`,
+      metaphor: `**Mục tiêu:** Tạo cặp ẩn dụ đối xứng (lên-xuống) cho: {{khai_niem}}\n**Đối tượng:** {{doi_tuong_hoc}}\n**Yêu cầu:** Gắn với khung tham chiếu sống động, chỉ ra tương đồng cấu trúc, cảnh báo giới hạn ẩn dụ.`
+    };
+
+    // Initialize Firebase
+    async function initFirebase() {
+      try {
+        const res = await fetch('/firebase-applet-config.json');
+        firebaseConfig = await res.json();
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = firebaseConfig.firestoreDatabaseId ? getFirestore(app, firebaseConfig.firestoreDatabaseId) : getFirestore(app);
+
+        onAuthStateChanged(auth, async (user) => {
+          currentUser = user;
+          const authContainer = document.getElementById('auth-container');
+          const cloudBadge = document.getElementById('cloud-badge');
+
+          if (user) {
+            cloudBadge.textContent = 'Cloud Sync (Firebase)';
+            cloudBadge.className = 'text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2.5 py-1 rounded-full font-medium';
+            authContainer.innerHTML = `
+              <div class="flex items-center gap-2">
+                <img src="${user.photoURL || 'https://via.placeholder.com/32'}" class="w-8 h-8 rounded-full border" style="border-color: var(--border-color);" />
+                <span class="text-xs font-medium hidden md:inline">${user.displayName || user.email}</span>
+                <button onclick="window.logoutFirebase()" class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium transition">Đăng xuất</button>
+              </div>
+            `;
+            // Setup real-time listener for user prompts
+            setupFirestoreListener(user.uid);
+          } else {
+            cloudBadge.textContent = 'LocalStorage';
+            cloudBadge.className = 'text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-full font-normal';
+            authContainer.innerHTML = `
+              <button onclick="window.loginWithGoogle()" class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm hover:bg-gray-50 transition">
+                <svg class="w-4 h-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                Đăng nhập Google
+              </button>
+            `;
+            if (unsubscribeFirestore) unsubscribeFirestore();
+          }
+        });
+      } catch (e) {
+        console.log('Firebase config not loaded or running offline:', e);
+      }
+    }
+
+    function setupFirestoreListener(uid) {
+      if (!db) return;
+      const q = query(collection(db, 'prompts'), where('userId', '==', uid));
+      unsubscribeFirestore = onSnapshot(q, (snapshot) => {
+        const cloudPrompts = [];
+        snapshot.forEach((docSnap) => {
+          cloudPrompts.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        // Sort by updatedAt descending
+        cloudPrompts.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        window.prompts = cloudPrompts;
+        localStorage.setItem("prompts_duymt_v4", JSON.stringify(window.prompts));
+        window.updateSuggestions();
+        window.renderPrompts();
+      }, (err) => {
+        console.error('Firestore listener error:', err);
+      });
+    }
+
+    window.loginWithGoogle = async function() {
+      if (!auth) {
+        window.showToast('Firebase chưa được khởi tạo!', 'error');
+        return;
+      }
+      try {
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+        window.showToast('Đăng nhập thành công!');
+      } catch (e) {
+        console.error(e);
+        window.showToast('Lỗi đăng nhập Google: ' + e.message, 'error');
+      }
+    };
+
+    window.logoutFirebase = async function() {
+      if (!auth) return;
+      try {
+        await signOut(auth);
+        window.showToast('Đã đăng xuất!');
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      window.loadTheme();
+      window.loadApiKeys();
+      window.updateSuggestions();
+      window.renderPrompts();
+      initFirebase();
+    });
+
+    // --- UTILITIES & THEME ---
+    function debounce(func, wait) {
+      return function(...args) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => func(...args), wait);
+      };
+    }
+    window.debouncedSearch = debounce(() => window.handleSearch(), 300);
+
+    window.loadTheme = function() {
+      const theme = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+    window.toggleTheme = function() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      document.getElementById('theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
+    }
+
+    window.showToast = function(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.innerHTML = type === 'error' ? `⚠️ ${msg}` : `✅ ${msg}`;
+      toast.className = `card-3d px-6 py-3 font-semibold fixed bottom-4 right-4 z-50 transition-transform duration-300 transform translate-x-0 ${type === 'error' ? 'text-red-600 border-l-4 border-red-500' : 'text-green-600 border-l-4 border-green-500'}`;
+      setTimeout(() => toast.classList.add('translate-x-[150%]'), 3000);
+    }
+
+    // --- IMAGE HANDLING ---
+    window.previewImage = function(input) {
+      const file = input.files[0];
+      if (!file) return;
+      if (file.size > 500 * 1024) {
+        window.showToast('Ảnh quá lớn! Vui lòng chọn ảnh dưới 500KB.', 'error');
+        input.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        window.currentImageBase64 = e.target.result;
+        const preview = document.getElementById('imagePreview');
+        preview.src = window.currentImageBase64;
+        preview.classList.remove('hidden');
+        document.getElementById('removeImage').classList.remove('hidden');
+        window.showToast('Đã tải ảnh đại diện thành công!');
+      };
+      reader.onerror = function() {
+        window.showToast('Lỗi đọc file ảnh!', 'error');
+      };
+      reader.readAsDataURL(file);
+    }
+    window.removeImage = function() {
+      window.currentImageBase64 = null;
+      document.getElementById('imageInput').value = '';
+      document.getElementById('imagePreview').classList.add('hidden');
+      document.getElementById('removeImage').classList.add('hidden');
+    }
+
+    // --- HYPERLINK ENHANCEMENT ---
+    window.enhanceLinks = function(text) {
+      const urlRegex = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+      return text.replace(urlRegex, function(url) {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="link-badge" title="Mở liên kết: ${url}">🔗 ${url.length > 30 ? url.substring(0, 30) + '...' : url}</a>`;
+      });
+    }
+
+    // --- DATA OPERATIONS ---
+    window.applyTemplate = function() {
+      const select = document.getElementById('templateSelect');
+      const key = select.value;
+      if (!key || !TEMPLATES[key]) return;
+      document.getElementById('content').value = TEMPLATES[key];
+      document.getElementById('content').focus();
+      select.value = "";
+      window.showToast('Đã áp dụng khung tư duy! Hãy điền các biến {{...}}');
+    }
+
+    window.savePrompt = async function() {
+      const title = document.getElementById('title').value.trim();
+      const content = document.getElementById('content').value.trim();
+      const category = document.getElementById('category').value.trim() || 'Uncategorized';
+      const rawHashtags = document.getElementById('hashtags').value;
+      const hashtags = rawHashtags.split(/[,#\s]+/).map(t => t.trim()).filter(t => t);
+      
+      if (!title || !content) return window.showToast('Vui lòng nhập Tiêu đề và Nội dung!', 'error');
+
+      const editId = document.getElementById('title').dataset.editId;
+      const now = new Date().toISOString();
+      const id = editId || crypto.randomUUID();
+
+      const promptData = {
+        id,
+        title, content, category, hashtags, 
+        image: window.currentImageBase64,
+        updatedAt: now,
+        userId: currentUser ? currentUser.uid : 'local_user'
+      };
+
+      if (!editId) {
+        promptData.createdAt = now;
+      }
+
+      // Save to Firestore if logged in
+      if (currentUser && db) {
+        try {
+          await setDoc(doc(db, 'prompts', id), promptData);
+          window.showToast(editId ? 'Đã cập nhật Prompt lên Cloud!' : 'Đã thêm Prompt mới lên Cloud!');
+        } catch (e) {
+          console.error(e);
+          window.showToast('Lỗi lưu Firebase: ' + e.message, 'error');
+          return;
+        }
+      } else {
+        // LocalStorage fallback
+        if (editId) {
+          const idx = window.prompts.findIndex(p => p.id === editId);
+          if (idx !== -1) {
+            window.prompts[idx] = { ...window.prompts[idx], ...promptData };
+          }
+          window.showToast('Đã cập nhật Prompt!');
+        } else {
+          window.prompts.unshift(promptData);
+          window.showToast('Đã thêm Prompt mới!');
+        }
+        window.saveToStorage();
+        window.renderPrompts();
+      }
+      
+      document.getElementById('title').dataset.editId = '';
+      clearForm();
+    }
+
+    function clearForm() {
+      document.getElementById('title').value = '';
+      document.getElementById('content').value = '';
+      document.getElementById('category').value = '';
+      document.getElementById('hashtags').value = '';
+      document.getElementById('title').dataset.editId = '';
+      window.removeImage();
+    }
+
+    window.saveToStorage = function() {
+      try {
+        localStorage.setItem("prompts_duymt_v4", JSON.stringify(window.prompts));
+        window.updateSuggestions();
+      } catch (e) {
+        window.showToast('Lỗi lưu trữ: Bộ nhớ đầy (do ảnh). Hãy xóa bớt hoặc xuất dữ liệu.', 'error');
+      }
+    }
+
+    window.editPrompt = function(id) {
+      const p = window.prompts.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('title').value = p.title;
+      document.getElementById('content').value = p.content;
+      document.getElementById('category').value = p.category;
+      document.getElementById('hashtags').value = (p.hashtags || []).join(', ');
+      document.getElementById('title').dataset.editId = id;
+      
+      if (p.image) {
+        window.currentImageBase64 = p.image;
+        const preview = document.getElementById('imagePreview');
+        preview.src = window.currentImageBase64;
+        preview.classList.remove('hidden');
+        document.getElementById('removeImage').classList.remove('hidden');
+      } else {
+        window.removeImage();
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.showToast('Đang chỉnh sửa: ' + p.title);
+    }
+
+    window.deletePrompt = async function(id) {
+      if (confirm('Bạn có chắc muốn xoá prompt này không?')) {
+        if (currentUser && db) {
+          try {
+            await deleteDoc(doc(db, 'prompts', id));
+            window.showToast('Đã xoá trên Cloud!');
+          } catch (e) {
+            console.error(e);
+            window.showToast('Lỗi xoá Firebase: ' + e.message, 'error');
+          }
+        } else {
+          window.prompts = window.prompts.filter(p => p.id !== id);
+          window.saveToStorage();
+          window.renderPrompts();
+          window.showToast('Đã xoá thành công!');
+        }
+      }
+    }
+
+    window.copyPrompt = function(id) {
+      const p = window.prompts.find(x => x.id === id);
+      if (!p) return;
+      navigator.clipboard.writeText(p.content).then(() => window.showToast('Đã sao chép nội dung!'));
+    }
+
+    // --- API KEYS & AI TEST RUNNER ---
+    window.loadApiKeys = function() {
+      const keys = JSON.parse(localStorage.getItem("ai_api_keys_v1") || "{}");
+      if (keys.gemini) document.getElementById('keyGemini').value = keys.gemini;
+      if (keys.openai) document.getElementById('keyOpenai').value = keys.openai;
+      if (keys.deepseek) document.getElementById('keyDeepseek').value = keys.deepseek;
+      if (keys.grok) document.getElementById('keyGrok').value = keys.grok;
+    }
+
+    window.saveApiKeys = function() {
+      const keys = {
+        gemini: document.getElementById('keyGemini').value.trim(),
+        openai: document.getElementById('keyOpenai').value.trim(),
+        deepseek: document.getElementById('keyDeepseek').value.trim(),
+        grok: document.getElementById('keyGrok').value.trim()
+      };
+      localStorage.setItem("ai_api_keys_v1", JSON.stringify(keys));
+      window.showToast("Đã lưu API Keys thành công!");
+    }
+
+    window.toggleApiKeysPanel = function() {
+      const panel = document.getElementById('apiKeysPanel');
+      const icon = document.getElementById('apiKeyToggleIcon');
+      if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        icon.textContent = '▼ Thu gọn';
+      } else {
+        panel.classList.add('hidden');
+        icon.textContent = '▶ Mở rộng';
+      }
+    }
+
+    window.updateModelOptions = function() {
+      const provider = document.getElementById('aiProvider').value;
+      const modelInput = document.getElementById('aiModel');
+      if (provider === 'gemini') modelInput.value = 'gemini-3.6-flash';
+      else if (provider === 'openai') modelInput.value = 'gpt-4o-mini';
+      else if (provider === 'deepseek') modelInput.value = 'deepseek-chat';
+      else if (provider === 'grok') modelInput.value = 'grok-beta';
+    }
+
+    window.openAiModal = function(id) {
+      const p = window.prompts.find(x => x.id === id);
+      if (!p) return;
+      activeAiPromptContent = p.content;
+      document.getElementById('aiModalPrompt').textContent = p.content;
+      document.getElementById('aiModalResultArea').classList.add('hidden');
+      document.getElementById('aiModalResult').innerHTML = '';
+      document.getElementById('aiModal').classList.add('active');
+    }
+
+    window.closeAiModal = function() {
+      document.getElementById('aiModal').classList.remove('active');
+    }
+
+    window.executeAiTest = async function() {
+      const provider = document.getElementById('aiProvider').value;
+      const model = document.getElementById('aiModel').value;
+      const outputMode = document.querySelector('input[name="outputMode"]:checked').value;
+      const btn = document.getElementById('aiRunBtn');
+      const resultArea = document.getElementById('aiModalResultArea');
+      const resultBox = document.getElementById('aiModalResult');
+
+      const apiKeys = {
+        gemini: document.getElementById('keyGemini').value.trim(),
+        openai: document.getElementById('keyOpenai').value.trim(),
+        deepseek: document.getElementById('keyDeepseek').value.trim(),
+        grok: document.getElementById('keyGrok').value.trim()
+      };
+
+      if (outputMode === 'newtab') {
+        const payload = encodeURIComponent(JSON.stringify({ prompt: activeAiPromptContent, provider, model, apiKeys }));
+        const html = '<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><title>Kết quả AI (' + provider.toUpperCase() + ')</title><script src="https://cdn.tailwindcss.com"><\/script><script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script><script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"><\/script></head><body class="p-8 bg-gray-50 text-gray-900 min-h-screen"><div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow border"><h1 class="text-xl font-bold text-indigo-600 mb-4">🚀 Kết quả trả về từ ' + provider.toUpperCase() + ' (' + model + ')</h1><div class="mb-4"><span class="text-xs font-semibold text-gray-500">Prompt:</span><div id="promptDisplay" class="p-3 bg-gray-100 rounded text-xs font-mono text-gray-700 max-h-32 overflow-y-auto mt-1"></div></div><div id="aiResultContent" class="prose max-w-none text-sm animate-pulse text-gray-500">⏳ Đang gọi ' + provider.toUpperCase() + ' API...</div></div><script>async function fetchAI() {try {const d = JSON.parse(decodeURIComponent("' + payload + '"));document.getElementById("promptDisplay").textContent = d.prompt;const res = await fetch("/api/generate", {method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: d.prompt, provider: d.provider, model: d.model, apiKeys: d.apiKeys })});const data = await res.json();if (data.error) throw new Error(data.error);document.getElementById("aiResultContent").className = "prose max-w-none text-sm";document.getElementById("aiResultContent").innerHTML = DOMPurify.sanitize(marked.parse(data.text));} catch(e) {document.getElementById("aiResultContent").innerHTML = \'<span class="text-red-500 font-semibold">Lỗi: \' + e.message + \'</span>\';}} fetchAI();<\/script></body></html>';
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        window.showToast('Đã mở kết quả ở tab trình duyệt mới!');
+        closeAiModal();
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = `Đang gọi ${provider.toUpperCase()}...`;
+      resultArea.classList.remove('hidden');
+      resultBox.innerHTML = `<div class="text-gray-500 animate-pulse">🤖 Đang tổng hợp phản hồi từ ${provider.toUpperCase()}...</div>`;
+
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: activeAiPromptContent, provider, model, apiKeys })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        resultBox.innerHTML = DOMPurify.sanitize(marked.parse(data.text));
+        
+        renderMathInElement(resultBox, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError: false
+        });
+      } catch (e) {
+        resultBox.innerHTML = `<span class="text-red-500">Lỗi: ${e.message}</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🚀 Gửi yêu cầu AI';
+      }
+    }
+
+    // --- RENDER & SEARCH ---
+    window.updateSuggestions = function() {
+      const categories = [...new Set(window.prompts.map(p => p.category))];
+      const hashtags = [...new Set(window.prompts.flatMap(p => p.hashtags || []))];
+      
+      const catDatalist = document.getElementById('category-suggestions');
+      catDatalist.innerHTML = categories.map(c => `<option value="${c}">`).join('');
+      
+      const hashDatalist = document.getElementById('hashtag-suggestions');
+      hashDatalist.innerHTML = hashtags.map(h => `<option value="${h}">`).join('');
+
+      const filterSelect = document.getElementById('categoryFilter');
+      const currentFilter = filterSelect.value;
+      filterSelect.innerHTML = '<option value="">📂 Tất cả thư mục</option>' + 
+        categories.map(c => `<option value="${c}" ${c === currentFilter ? 'selected' : ''}>${c}</option>`).join('');
+    }
+
+    window.handleSearch = function() {
+      window.currentPage = 1;
+      window.renderPrompts();
+    }
+
+    window.renderPrompts = function() {
+      const list = document.getElementById('promptList');
+      const searchQuery = document.getElementById('search').value.toLowerCase();
+      const categoryFilter = document.getElementById('categoryFilter').value;
+
+      let filtered = window.prompts.filter(p => {
+        const matchSearch = p.title.toLowerCase().includes(searchQuery) || 
+                            p.content.toLowerCase().includes(searchQuery) ||
+                            (p.hashtags && p.hashtags.some(h => h.toLowerCase().includes(searchQuery)));
+        const matchCat = !categoryFilter || p.category === categoryFilter;
+        return matchSearch && matchCat;
+      });
+
+      const totalPages = Math.ceil(filtered.length / window.itemsPerPage) || 1;
+      if (window.currentPage > totalPages) window.currentPage = totalPages;
+      const start = (window.currentPage - 1) * window.itemsPerPage;
+      const paginatedItems = filtered.slice(start, start + window.itemsPerPage);
+
+      if (paginatedItems.length === 0) {
+        list.innerHTML = `<div class="text-center py-10 text-gray-500">Không tìm thấy prompt nào.</div>`;
+      } else {
+        list.innerHTML = paginatedItems.map(p => {
+          const contentWithLinks = window.enhanceLinks(p.content);
+          const cleanHtml = DOMPurify.sanitize(marked.parse(contentWithLinks));
+          
+          const imageHtml = p.image ? `<img src="${p.image}" class="w-full h-32 object-cover rounded-t-lg border-b" style="border-color: var(--border-color);" alt="Prompt Image">` : '';
+          const hashtagsHtml = (p.hashtags || []).map(h => `<span class="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-600 dark:text-gray-300">#${h}</span>`).join(' ');
+
+          return `
+            <div class="card-3d overflow-hidden">
+              ${imageHtml}
+              <div class="p-5">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 class="text-lg font-bold" style="color: var(--accent);">${p.title}</h3>
+                    <div class="flex items-center gap-2 text-xs mt-1" style="color: var(--text-secondary);">
+                      <span class="font-semibold bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded">${p.category}</span>
+                      <span>${new Date(p.updatedAt).toLocaleDateString('vi-VN')}</span>
+                    </div>
+                  </div>
+                  <div class="flex gap-1.5 no-print items-center">
+                    <button onclick="openAiModal('${p.id}')" class="bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1 rounded text-xs font-semibold hover:bg-indigo-100 transition flex items-center gap-1" title="Chạy thử với Gemini AI">🧪 Chạy thử</button>
+                    <button onclick="copyPrompt('${p.id}')" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Sao chép">📋</button>
+                    <button onclick="editPrompt('${p.id}')" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Chỉnh sửa">✏️</button>
+                    <button onclick="deletePrompt('${p.id}')" class="p-2 rounded hover:bg-red-100 dark:hover:bg-red-900 text-red-500" title="Xoá">🗑️</button>
+                  </div>
+                </div>
+                <div class="prose max-w-none text-sm mb-4" style="color: var(--text-primary);">${cleanHtml}</div>
+                <div class="flex flex-wrap gap-2 mt-2">${hashtagsHtml}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Render KaTeX
+      renderMathInElement(list, {
+        delimiters: [
+          {left: '$$', right: '$$', display: true},
+          {left: '$', right: '$', display: false}
+        ],
+        throwOnError: false
+      });
+
+      // Render Pagination
+      const pagination = document.getElementById('pagination');
+      if (totalPages > 1) {
+        let pagesHtml = '';
+        for (let i = 1; i <= totalPages; i++) {
+          pagesHtml += `<button onclick="changePage(${i})" class="px-3 py-1 rounded border ${i === window.currentPage ? 'bg-indigo-600 text-white border-indigo-600' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}">${i}</button>`;
+        }
+        pagination.innerHTML = pagesHtml;
+      } else {
+        pagination.innerHTML = '';
+      }
+    }
+
+    window.changePage = function(page) {
+      window.currentPage = page;
+      window.renderPrompts();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // --- IMPORT / EXPORT ---
+    window.exportData = function() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.prompts, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", "prompts_duymt_backup.json");
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+      window.showToast('Đã xuất dữ liệu thành công!');
+    }
+
+    window.importData = function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (Array.isArray(imported)) {
+            window.prompts = imported;
+            window.saveToStorage();
+            window.renderPrompts();
+            window.showToast('Đã nhập dữ liệu thành công!');
+          } else {
+            window.showToast('Định dạng file không hợp lệ!', 'error');
+          }
+        } catch (err) {
+          window.showToast('Lỗi đọc file JSON!', 'error');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+  </script>
+</body>
+</html>

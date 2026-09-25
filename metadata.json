@@ -1,0 +1,6 @@
+{
+  "name": "Prompt Harnessing System (Duymt Framework)",
+  "description": "Hệ thống Quản lý Prompt & Harnessing với cấu trúc hóa tư duy, ẩn dụ đa tầng, hỗ trợ Markdown, LaTeX, upload ảnh và liên kết thông minh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
