@@ -770,24 +770,68 @@
     window.importData = function(event) {
       const file = event.target.files[0];
       if (!file) return;
+
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = async function(e) {
         try {
           const imported = JSON.parse(e.target.result);
-          if (Array.isArray(imported)) {
+
+          if (!Array.isArray(imported)) {
+            window.showToast('Định dạng file không hợp lệ!', 'error');
+            return;
+          }
+
+          if (currentUser && db) {
+            // Import vào Cloud: mọi note được gắn với tài khoản đang đăng nhập.
+            const now = new Date().toISOString();
+            const normalized = imported.map((item) => {
+              const id = item.id || crypto.randomUUID();
+              return {
+                ...item,
+                id,
+                title: item.title || 'Không có tiêu đề',
+                content: item.content || '',
+                category: item.category || 'Uncategorized',
+                hashtags: Array.isArray(item.hashtags) ? item.hashtags : [],
+                image: item.image || null,
+                updatedAt: item.updatedAt || now,
+                createdAt: item.createdAt || item.updatedAt || now,
+                userId: currentUser.uid
+              };
+            });
+
+            await Promise.all(
+              normalized.map((promptData) =>
+                setDoc(doc(db, 'prompts', promptData.id), promptData)
+              )
+            );
+
+            // onSnapshot sẽ tự đồng bộ lại window.prompts từ Firestore.
+            window.prompts = normalized;
+            window.saveToStorage();
+            window.renderPrompts();
+            window.showToast(`Đã nhập ${normalized.length} note lên Cloud!`);
+          } else {
+            // Chưa đăng nhập: giữ cơ chế LocalStorage như trước.
             window.prompts = imported;
             window.saveToStorage();
             window.renderPrompts();
-            window.showToast('Đã nhập dữ liệu thành công!');
-          } else {
-            window.showToast('Định dạng file không hợp lệ!', 'error');
+            window.showToast('Đã nhập dữ liệu vào bộ nhớ cục bộ!');
           }
         } catch (err) {
-          window.showToast('Lỗi đọc file JSON!', 'error');
+          console.error('Import JSON error:', err);
+          window.showToast('Lỗi nhập JSON: ' + (err.message || 'Không đọc được dữ liệu!'), 'error');
+        } finally {
+          event.target.value = '';
         }
       };
+
+      reader.onerror = function() {
+        window.showToast('Lỗi đọc file JSON!', 'error');
+        event.target.value = '';
+      };
+
       reader.readAsText(file);
-      event.target.value = '';
     }
   </script>
 </body>
